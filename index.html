@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1d4ed8">
+<title>PC 수리기록</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<style>
+  /* ===== 화면 꾸미기 (색, 크기) ===== */
+  :root { --blue:#1d4ed8; --bg:#f1f5f9; --card:#fff; --line:#e2e8f0; --text:#0f172a; --muted:#64748b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Noto Sans KR", sans-serif; background:var(--bg); color:var(--text); font-size:17px; }
+  header { background:var(--blue); color:#fff; padding:14px 16px; position:sticky; top:0; z-index:5; }
+  h1 { margin:0; font-size:20px; }
+  main { padding:12px; max-width:600px; margin:0 auto 40px; }
+  .card { background:var(--card); border-radius:14px; padding:14px; margin-bottom:12px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  h2 { font-size:16px; margin:0 0 10px; }
+  label { display:block; font-size:14px; color:var(--muted); margin-bottom:10px; }
+  input { display:block; width:100%; margin-top:4px; padding:12px; font-size:17px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--text); }
+  .btns { display:flex; flex-wrap:wrap; gap:8px; }
+  .btns button { padding:12px 14px; font-size:16px; border:1px solid var(--line); border-radius:10px; background:#f8fafc; color:var(--text); }
+  .btns button.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .btns button.other { border-style:dashed; }
+  #targetBtns button, #kindBtns button { flex:1; font-size:18px; padding:16px 0; font-weight:600; }
+  #symptomText, #actionText { margin-top:10px; }
+  .hidden { display:none !important; }
+  .hint { font-size:13px; color:var(--muted); margin:8px 0 0; }
+  .summary { background:#e0e7ff; border-radius:10px; padding:12px; font-size:15px; margin-bottom:10px; }
+  .primary { width:100%; padding:16px; font-size:18px; font-weight:700; background:var(--blue); color:#fff; border:0; border-radius:12px; margin-bottom:16px; }
+  .secondary { width:100%; padding:14px; font-size:16px; background:#fff; color:var(--blue); border:2px solid var(--blue); border-radius:12px; font-weight:600; }
+  .row { display:flex; gap:8px; } .row label { flex:1; min-width:0; }
+  ul { list-style:none; padding:0; margin:0; }
+  li { border-top:1px solid var(--line); padding:10px 0; display:flex; gap:8px; align-items:flex-start; }
+  li .txt { flex:1; font-size:15px; }
+  li .meta { font-size:13px; color:var(--muted); }
+  li button { border:0; background:#fee2e2; color:#b91c1c; border-radius:8px; padding:8px 10px; font-size:14px; }
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#0f172a; color:#fff; padding:12px 18px; border-radius:999px; font-size:15px; opacity:0; transition:opacity .2s; pointer-events:none; white-space:nowrap; }
+  #toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<header><h1>PC 수리기록</h1></header>
+
+<main>
+  <!-- 날짜 / 부서 / 내선번호 -->
+  <section class="card">
+    <label>날짜 <input type="date" id="date"></label>
+    <label>부서 <input id="dept" list="deptList" placeholder="고르거나 직접 입력"></label>
+    <datalist id="deptList"></datalist>
+    <label>내선번호 또는 이름 <input id="ext" placeholder="예: 2548"></label>
+  </section>
+
+  <!-- ① 대상 -->
+  <section class="card">
+    <h2>① 대상</h2>
+    <div class="btns" id="targetBtns"></div>
+  </section>
+
+  <!-- ② 증상 -->
+  <section class="card hidden" id="symptomCard">
+    <h2>② 증상</h2>
+    <div class="btns" id="symptomBtns"></div>
+    <input id="symptomText" class="hidden" placeholder="증상을 직접 입력">
+  </section>
+
+  <!-- ③ 조치사항 -->
+  <section class="card hidden" id="actionCard">
+    <h2>③ 조치사항</h2>
+    <div class="btns" id="actionBtns"></div>
+    <input id="actionText" class="hidden" placeholder="조치사항을 직접 입력">
+  </section>
+
+  <!-- ④ 구분 -->
+  <section class="card hidden" id="kindCard">
+    <h2>④ 구분</h2>
+    <div class="btns" id="kindBtns"></div>
+    <p class="hint">조치사항에 맞춰 자동으로 골라져요. 틀리면 눌러서 바꿔주세요.</p>
+  </section>
+
+  <div class="summary" id="summary"></div>
+  <button id="saveBtn" class="primary" type="button">저장하기</button>
+
+  <!-- 엑셀(CSV) 내보내기 -->
+  <section class="card">
+    <h2>엑셀(CSV)로 내보내기</h2>
+    <div class="row">
+      <label>시작일 <input type="date" id="from"></label>
+      <label>종료일 <input type="date" id="to"></label>
+    </div>
+    <button id="exportBtn" class="secondary" type="button">CSV 파일 내려받기</button>
+    <p class="hint">처음엔 이번 주 월~금이 들어가 있어요. 매주 내려받아 두면 백업도 됩니다.</p>
+  </section>
+
+  <!-- 저장된 기록 -->
+  <section class="card">
+    <h2>최근 기록 <span id="count"></span></h2>
+    <ul id="recordList"></ul>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script>
+// =====================================================
+// 1. 버튼 목록  ★ 여기만 고치면 버튼이 바뀝니다 ★
+//    조치사항 뒤의 'H'는 H/W, 'S'는 S/W 입니다.
+// =====================================================
+const LISTS = {
+  'PC': {
+    symptoms: ['부팅안됨', '전원안들어옴', '블루스크린', '무한재부팅', 'PC느림', '문서안열림',
+               '한글안열림', '엑셀오류', '인터넷안됨', '특정사이트접속안됨', '메신저안됨',
+               '비밀번호분실', '윈도우재설치요청', '정품인증'],
+    actions: [
+      ['메모리카드 탈부착', 'H'], ['메인보드 초기화', 'H'], ['전원케이블 교체/재장착', 'H'],
+      ['중고파워 교체', 'H'], ['중고PC 교체', 'H'],
+      ['윈도우11 설치', 'S'], ['프로그램 정리', 'S'], ['보안프로그램 설치', 'S'],
+      ['한글 재설치', 'S'], ['엑셀 재설치', 'S'], ['정품인증', 'S'], ['인터넷옵션 변경', 'S'],
+      ['연결프로그램 변경', 'S'], ['내PC지킴이 실행', 'S'], ['IP 입력', 'S'],
+      ['비밀번호 초기화', 'S'], ['메신저 삭제 후 재설치', 'S'], ['재부팅 후 정상', 'S']
+    ]
+  },
+  '모니터': {
+    symptoms: ['화면안나옴', '화면떨림/깜빡임', '듀얼모니터 한쪽안나옴', '모니터안켜짐',
+               '화면에 줄감', '모니터 추가/교체요청'],
+    actions: [
+      ['모니터케이블 탈부착', 'H'], ['모니터케이블 교체', 'H'], ['전원케이블 교체', 'H'],
+      ['VGA카드 교체', 'H'], ['드라이버 설치', 'S'], ['중고모니터 교체', 'H'],
+      ['중고모니터 추가설치', 'H']
+    ]
+  },
+  '기타': { symptoms: [], actions: [] }   // 기타는 직접 입력만
+};
+
+// 부서 목록 (고르거나 직접 입력 가능)
+const DEPTS = ['의회사무과', '기획예산과', '기획감사실', '자치행정과', '조직인사', '세무회계과',
+  '허가민원과', '관광문화과', '교육체육과', '복지과', '복지정책과', '육아지원과', '환경과',
+  '산림녹지과', '건설과', '도시계획과', '지적정보', '해양수산과', '재난안전과', '경제에너지과',
+  '스마트교통과', '삭도추진단', '상하수도사업소', '농업기술센터', '보건소', '양양읍사무소',
+  '서면사무소', '손양면사무소', '강현면사무소', '현북면사무소', '현남면사무소',
+  '서면보건지소', '손양보건지소', '현북보건지소', '어성전보건진료소', '입암보건진료소',
+  '자원봉사센터', '선사유적박물관', '국민체육센터', '웰컴센터', '수영장', '양양군의회'];
+
+// =====================================================
+// 2. 준비물 (작은 도우미 함수들)
+// =====================================================
+const OTHER = '기타(직접입력)';
+const STORE_KEY = 'pcRepairRecords';          // 폰에 저장할 때 쓰는 이름표
+const $ = id => document.getElementById(id);   // 화면 요소 찾기
+
+// 지금 고른 것들을 기억하는 곳
+const state = { target: null, symptom: null, action: null, kind: null };
+
+// 날짜를 '2026-09-23' 모양으로
+function dateStr(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+// '2026-09-23' → '09월 23일' (보고서 모양)
+function fmtDate(s) { const p = s.split('-'); return p[1] + '월 ' + p[2] + '일'; }
+// 이번 주 월요일, 금요일
+function thisWeek() {
+  const d = new Date(), day = d.getDay();
+  const mon = new Date(d); mon.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  const fri = new Date(mon); fri.setDate(mon.getDate() + 4);
+  return [dateStr(mon), dateStr(fri)];
+}
+// '보건소' + '2548' → '보건소/2548'
+function deptExt(r) { return r.ext ? r.dept + '/' + r.ext : r.dept; }
+// 요소 보이기/숨기기
+function show(id, yes) { $(id).classList.toggle('hidden', !yes); }
+// 아래쪽에 잠깐 뜨는 알림
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// =====================================================
+// 3. 폰에 저장하기 / 불러오기
+// =====================================================
+function loadAll() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch (e) { return []; }
+}
+function saveAll(list) { localStorage.setItem(STORE_KEY, JSON.stringify(list)); }
+
+// =====================================================
+// 4. 버튼 그리기
+// =====================================================
+function drawButtons(boxId, items, selected, onPick) {
+  const box = $(boxId);
+  box.innerHTML = '';
+  items.forEach(label => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    if (label === selected) b.classList.add('on');
+    if (label === OTHER) b.classList.add('other');
+    b.onclick = () => onPick(label);
+    box.appendChild(b);
+  });
+}
+
+// 화면 전체를 지금 상태에 맞게 다시 그리기
+function render() {
+  const t = state.target;
+  const isEtc = t === '기타';
+
+  drawButtons('targetBtns', Object.keys(LISTS), t, pickTarget);
+
+  // ② 증상: 대상을 고르면 보임
+  show('symptomCard', !!t);
+  if (t) {
+    drawButtons('symptomBtns', isEtc ? [] : [...LISTS[t].symptoms, OTHER], state.symptom, pickSymptom);
+    show('symptomText', isEtc || state.symptom === OTHER);
+  }
+
+  // ③ 조치사항: 증상을 고르면 보임 (기타는 바로 보임)
+  const symptomPicked = t && (isEtc || state.symptom);
+  show('actionCard', !!symptomPicked);
+  if (symptomPicked) {
+    drawButtons('actionBtns', isEtc ? [] : [...LISTS[t].actions.map(a => a[0]), OTHER], state.action, pickAction);
+    show('actionText', isEtc || state.action === OTHER);
+  }
+
+  // ④ 구분: 조치사항을 고르면 보임
+  const actionPicked = symptomPicked && (isEtc || state.action);
+  show('kindCard', !!actionPicked);
+  drawButtons('kindBtns', ['H/W', 'S/W'], state.kind, k => { state.kind = k; render(); });
+
+  updateSummary();
+}
+
+// =====================================================
+// 5. 버튼을 눌렀을 때
+// =====================================================
+function pickTarget(t) {
+  state.target = t;
+  state.symptom = null;
+  state.action = null;
+  state.kind = (t === '기타') ? 'H/W' : null;
+  $('symptomText').value = '';
+  $('actionText').value = '';
+  render();
+  if (t === '기타') $('symptomText').focus();
+}
+function pickSymptom(s) {
+  state.symptom = s;
+  render();
+  if (s === OTHER) $('symptomText').focus();
+}
+function pickAction(a) {
+  state.action = a;
+  if (a !== OTHER) {
+    // 조치사항에 붙은 H/S 표시로 구분을 자동 선택
+    const found = LISTS[state.target].actions.find(x => x[0] === a);
+    state.kind = found[1] === 'H' ? 'H/W' : 'S/W';
+  } else if (!state.kind) {
+    state.kind = state.target === '모니터' ? 'H/W' : 'S/W';
+  }
+  render();
+  if (a === OTHER) $('actionText').focus();
+}
+
+// 직접입력이면 입력칸 글자를, 아니면 고른 버튼 글자를 사용
+function getSymptom() {
+  return (state.target === '기타' || state.symptom === OTHER) ? $('symptomText').value.trim() : (state.symptom || '');
+}
+function getAction() {
+  return (state.target === '기타' || state.action === OTHER) ? $('actionText').value.trim() : (state.action || '');
+}
+
+// 저장 버튼 위에 지금 입력한 내용을 한 줄로 보여줌
+function updateSummary() {
+  const d = $('date').value ? fmtDate($('date').value) : '날짜?';
+  const who = deptExt({ dept: $('dept').value.trim() || '부서?', ext: $('ext').value.trim() });
+  $('summary').textContent = d + ' | ' + who + ' | ' + (state.kind || '구분?') + ' | ' +
+    (getSymptom() || '증상?') + ' → ' + (getAction() || '조치?');
+}
+
+// =====================================================
+// 6. 저장하기
+// =====================================================
+function saveRecord() {
+  const rec = {
+    id: Date.now(),
+    date: $('date').value,
+    dept: $('dept').value.trim(),
+    ext: $('ext').value.trim(),
+    target: state.target,
+    kind: state.kind,
+    symptom: getSymptom(),
+    action: getAction()
+  };
+  if (!rec.date) return toast('날짜를 골라주세요');
+  if (!rec.dept) return toast('부서를 입력해주세요');
+  if (!rec.target) return toast('대상을 골라주세요');
+  if (!rec.symptom) return toast('증상을 골라주세요');
+  if (!rec.action) return toast('조치사항을 골라주세요');
+  if (!rec.kind) return toast('구분(H/W, S/W)을 골라주세요');
+
+  try {
+    const all = loadAll();
+    all.push(rec);
+    saveAll(all);
+  } catch (e) {
+    return toast('저장에 실패했어요. 다시 눌러주세요');
+  }
+
+  // 다음 입력을 위해 비우기 (날짜는 그대로 둠)
+  $('dept').value = '';
+  $('ext').value = '';
+  pickTarget(null);
+  renderList();
+  toast('저장했어요 ✅');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// =====================================================
+// 7. 최근 기록 목록 (최근 50건)
+// =====================================================
+function renderList() {
+  const all = loadAll().sort((a, b) => a.date === b.date ? b.id - a.id : (a.date < b.date ? 1 : -1));
+  $('count').textContent = '(전체 ' + all.length + '건)';
+  const ul = $('recordList');
+  ul.innerHTML = '';
+  all.slice(0, 50).forEach(r => {
+    const li = document.createElement('li');
+    const txt = document.createElement('div');
+    txt.className = 'txt';
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = fmtDate(r.date) + ' · ' + deptExt(r) + ' · ' + r.kind;
+    txt.appendChild(meta);
+    txt.appendChild(document.createTextNode(r.symptom + ' → ' + r.action));
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = '삭제';
+    del.onclick = () => {
+      if (!confirm('이 기록을 지울까요?')) return;
+      saveAll(loadAll().filter(x => x.id !== r.id));
+      renderList();
+      toast('지웠어요');
+    };
+    li.appendChild(txt);
+    li.appendChild(del);
+    ul.appendChild(li);
+  });
+}
+
+// =====================================================
+// 8. CSV(엑셀) 내보내기 - 보고서와 같은 열 순서
+// =====================================================
+function csvCell(v) { return '"' + String(v ?? '').replace(/"/g, '""') + '"'; }
+
+function exportCsv() {
+  const from = $('from').value, to = $('to').value;
+  if (!from || !to) return toast('시작일과 종료일을 골라주세요');
+  if (from > to) return toast('시작일이 종료일보다 늦어요');
+
+  const rows = loadAll()
+    .filter(r => r.date >= from && r.date <= to)
+    .sort((a, b) => a.date === b.date ? a.id - b.id : (a.date < b.date ? -1 : 1));
+  if (!rows.length) return toast('그 기간에 기록이 없어요');
+
+  const lines = [['일자', '부서/이름', '구분', '세부내용', '처리내용']];
+  let lastDate = '';
+  rows.forEach(r => {
+    // 보고서처럼 같은 날은 첫 줄에만 날짜 표시
+    lines.push([r.date !== lastDate ? fmtDate(r.date) : '', deptExt(r), r.kind, r.symptom, r.action]);
+    lastDate = r.date;
+  });
+  const csv = lines.map(cols => cols.map(csvCell).join(',')).join('\r\n');
+
+  // 맨 앞 \uFEFF 는 엑셀에서 한글이 깨지지 않게 해줌
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'PC수리기록_' + from + '_' + to + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast(rows.length + '건 내보냈어요');
+}
+
+// =====================================================
+// 9. 처음 열었을 때 준비
+// =====================================================
+$('date').value = dateStr();
+const wk = thisWeek();
+$('from').value = wk[0];
+$('to').value = wk[1];
+$('deptList').innerHTML = DEPTS.map(d => '<option value="' + d + '">').join('');
+
+['date', 'dept', 'ext', 'symptomText', 'actionText'].forEach(id => $(id).addEventListener('input', updateSummary));
+$('saveBtn').onclick = saveRecord;
+$('exportBtn').onclick = exportCsv;
+
+render();
+renderList();
+
+// 폰이 저장공간을 정리할 때 이 기록은 지우지 말라고 요청
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+// 인터넷 없어도 열리게 하는 장치 등록
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
