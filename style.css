@@ -1,0 +1,409 @@
+/* ===== 색상 모음 (여기 값만 바꾸면 전체 색이 바뀜) ===== */
+:root {
+  --main: #1e6fd9;       /* 주 색상 (파란색) */
+  --main-dark: #1557ad;  /* 버튼 누를 때 색 */
+  --bg: #f1f4f8;         /* 배경색 */
+  --card: #ffffff;       /* 카드(상자) 배경색 */
+  --text: #1f2937;       /* 글자색 */
+  --sub-text: #6b7280;   /* 흐린 글자색 */
+  --line: #d1d5db;       /* 테두리 색 */
+  --danger: #dc2626;     /* 삭제 버튼 색 (빨간색) */
+}
+
+/* 모든 요소의 크기 계산을 테두리 포함으로 통일 (레이아웃이 덜 깨짐) */
+* {
+  box-sizing: border-box;
+}
+
+/* 페이지 전체 기본 설정 */
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  font-size: 18px;       /* 휴대폰에서 읽기 편하도록 글씨를 크게 */
+  line-height: 1.5;
+}
+
+/* ===== 맨 위 제목 막대 ===== */
+.top-bar {
+  background: var(--main);
+  color: #fff;
+  padding: 16px;
+  text-align: center;
+  position: sticky;      /* 스크롤해도 위에 붙어 있음 */
+  top: 0;
+  z-index: 10;
+}
+.top-bar h1 {
+  margin: 0 0 12px;
+  font-size: 24px;
+}
+
+/* ===== 탭 메뉴 (입력 / 목록 / 통계) ===== */
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);  /* 3칸으로 똑같이 나눔 */
+  gap: 6px;
+}
+.tab {
+  padding: 12px 0;
+  background: rgba(255, 255, 255, 0.2);   /* 반투명 흰색 */
+  color: #fff;
+  font-weight: bold;
+}
+/* 현재 선택된 탭 */
+.tab.active {
+  background: #fff;
+  color: var(--main);
+}
+
+/* 숨김 처리용 (자바스크립트가 이 이름을 붙였다 뗐다 함) */
+.hidden {
+  display: none !important;
+}
+
+/* 본문 영역: 가운데 정렬, 너무 넓어지지 않게 제한 */
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* ===== 카드(흰 상자) ===== */
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 20px 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.card h2 {
+  margin: 0 0 12px;
+  font-size: 22px;
+}
+
+/* ===== 입력칸 이름표 ===== */
+label {
+  display: block;
+  font-weight: bold;
+  margin: 16px 0 6px;
+}
+label small {
+  font-weight: normal;
+  color: var(--sub-text);
+}
+
+/* ===== 입력칸 (글자, 날짜, 월, 드롭다운, 여러 줄) ===== */
+input[type="text"],
+input[type="date"],
+input[type="month"],
+select,
+textarea {
+  width: 100%;
+  font-size: 18px;       /* 16px보다 작으면 아이폰에서 자동 확대되므로 크게 */
+  padding: 14px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  font-family: inherit;
+  background: #fff;
+}
+/* 드롭다운 오른쪽에 ▼ 화살표 그리기 (기본 모양은 폰마다 달라서 통일) */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  color: var(--text);
+  padding-right: 40px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--sub-text) 50%),
+                    linear-gradient(135deg, var(--sub-text) 50%, transparent 50%);
+  background-position: right 20px center, right 14px center;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+
+/* "직접 입력"을 골랐을 때 나타나는 글자칸 */
+.etc-input {
+  margin-top: 8px;
+}
+
+/* 입력칸을 눌렀을 때 테두리 색 강조 */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--main);
+}
+
+/* ===== 장비 종류 선택 버튼들 ===== */
+.device-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);  /* 한 줄에 3개씩 */
+  gap: 8px;
+}
+/* 선택 버튼 하나하나를 감싸는 label */
+.device-option {
+  margin: 0;
+  font-weight: normal;
+}
+/* 증상·조치사항 버튼: 글자가 길어서 한 줄에 2개씩 */
+.chip-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.chip-group span {
+  font-size: 16px;
+  word-break: keep-all;   /* 한글 단어 중간에서 줄바꿈하지 않기 */
+}
+
+/* 진짜 동그라미 라디오 버튼은 숨김 */
+/* (display:none으로 숨기면 "선택하세요" 경고가 안 떠서 투명하게만 만듦) */
+.device-option {
+  position: relative;
+}
+.device-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+/* 대신 글자 부분을 큰 버튼처럼 꾸밈 */
+.device-option span {
+  display: block;
+  text-align: center;
+  padding: 14px 4px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+/* 선택된 버튼은 파란색으로 표시 */
+.device-option input:checked + span {
+  background: var(--main);
+  border-color: var(--main);
+  color: #fff;
+  font-weight: bold;
+}
+
+/* ===== 버튼 공통 ===== */
+button {
+  font-family: inherit;
+  font-size: 18px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+/* 저장 버튼: 크고 눈에 띄게 */
+.btn-save {
+  width: 100%;
+  margin-top: 24px;
+  padding: 18px;
+  font-size: 20px;
+  font-weight: bold;
+  background: var(--main);
+  color: #fff;
+}
+.btn-save:active {
+  background: var(--main-dark);
+}
+
+/* 보조 버튼 (전체 보기) */
+.btn-sub {
+  padding: 14px 16px;
+  background: #e5e7eb;
+  color: var(--text);
+  white-space: nowrap;   /* 글자가 줄바꿈되지 않게 */
+}
+
+/* ===== 월별/일별 전환 버튼 ===== */
+.toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #e5e7eb;
+  border-radius: 12px;
+  padding: 4px;
+}
+.toggle-btn {
+  padding: 12px 0;
+  background: transparent;
+  color: var(--sub-text);
+  font-weight: bold;
+}
+.toggle-btn.active {
+  background: #fff;
+  color: var(--main);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* 총 건수 안내 문구 */
+.summary {
+  margin: 16px 0 0;
+  font-weight: bold;
+  color: var(--main);
+}
+
+/* ===== 엑셀 내보내기 버튼 ===== */
+.export-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+.btn-export {
+  padding: 14px 4px;
+  background: #1d7a45;     /* 엑셀 느낌의 초록색 */
+  color: #fff;
+  font-weight: bold;
+  font-size: 16px;
+}
+/* 주차 선택칸 + CSV 버튼을 한 줄에 */
+.csv-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+.csv-row .btn-export {
+  padding: 14px 16px;
+}
+
+/* 통계 화면의 한 줄 전체 폭 버튼 */
+.btn-wide {
+  width: 100%;
+  margin-top: 16px;
+}
+/* 구분(H/W, S/W) 버튼은 2칸 */
+.kind-group {
+  grid-template-columns: 1fr 1fr;
+}
+.btn-export:active {
+  background: #155c33;
+}
+/* 전체 내보내기는 테두리만 있는 보조 버튼 */
+.btn-export-sub {
+  background: #fff;
+  color: #1d7a45;
+  border: 2px solid #1d7a45;
+}
+.btn-export-sub:active {
+  background: #e8f5ed;
+}
+
+/* ===== 통계: 연도/기간 선택칸을 한 줄에 2개 ===== */
+.stats-select {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* 통계 맨 위 큰 숫자 (총 건수) */
+.stats-total {
+  margin: 20px 0 4px;
+  padding: 16px;
+  background: #eaf2fd;
+  border-radius: 12px;
+  text-align: center;
+}
+.stats-total strong {
+  display: block;
+  font-size: 36px;
+  color: var(--main);
+}
+
+/* 통계 소제목 (부서별, 증상별 ...) */
+.stats-title {
+  margin: 24px 0 10px;
+  font-size: 19px;
+}
+
+/* 막대그래프 한 줄: [이름] [막대] [건수] */
+.bar-row {
+  display: grid;
+  grid-template-columns: 7.5em 1fr 3em;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+.bar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;  /* 이름이 길면 ... 으로 줄임 */
+  white-space: nowrap;
+}
+.bar-track {
+  background: #eef0f3;
+  border-radius: 6px;
+  height: 22px;
+}
+.bar-fill {
+  background: var(--main);
+  border-radius: 6px;
+  height: 100%;
+}
+.bar-count {
+  text-align: right;
+  font-weight: bold;
+}
+
+/* ===== 목록 ===== */
+/* 날짜 제목 (예: 2026-09-23 · 3건) */
+.date-title {
+  margin: 20px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--main);
+  color: var(--main);
+  font-size: 19px;
+}
+
+/* 기록 한 건 */
+.record {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+}
+.record-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+/* 장비 종류 꼬리표 */
+.tag {
+  display: inline-block;
+  background: var(--main);
+  color: #fff;
+  font-size: 15px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  margin-right: 6px;
+}
+.who {
+  font-weight: bold;
+}
+/* 항목 한 줄 (증상, 조치, 부품) */
+.record p {
+  margin: 4px 0;
+  white-space: pre-wrap; /* 여러 줄로 입력한 내용의 줄바꿈 유지 */
+  word-break: break-all;
+}
+.record p b {
+  color: var(--sub-text);
+}
+
+/* 삭제 버튼 */
+.btn-delete {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  font-size: 15px;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+
+/* 기록이 없을 때 안내 문구 */
+.empty {
+  text-align: center;
+  color: var(--sub-text);
+  padding: 24px 0;
+}
