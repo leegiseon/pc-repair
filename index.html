@@ -90,8 +90,8 @@
       <label>시작일 <input type="date" id="from"></label>
       <label>종료일 <input type="date" id="to"></label>
     </div>
-    <button id="exportBtn" class="secondary" type="button">CSV 파일 내려받기</button>
-    <p class="hint">처음엔 이번 주 월~금이 들어가 있어요. 매주 내려받아 두면 백업도 됩니다.</p>
+    <button id="exportBtn" class="secondary" type="button">내보내기</button>
+    <p class="hint">누르면 공유 창이 떠요. 카톡(나에게 보내기)이나 이메일을 고르세요. 매주 보내 두면 백업도 됩니다.</p>
   </section>
 
   <!-- 저장된 기록 -->
@@ -135,13 +135,16 @@ const LISTS = {
 };
 
 // 부서 목록 (고르거나 직접 입력 가능)
-const DEPTS = ['의회사무과', '기획예산과', '기획감사실', '자치행정과', '조직인사', '세무회계과',
-  '허가민원과', '관광문화과', '교육체육과', '복지과', '복지정책과', '육아지원과', '환경과',
-  '산림녹지과', '건설과', '도시계획과', '지적정보', '해양수산과', '재난안전과', '경제에너지과',
-  '스마트교통과', '삭도추진단', '상하수도사업소', '농업기술센터', '보건소', '양양읍사무소',
-  '서면사무소', '손양면사무소', '강현면사무소', '현북면사무소', '현남면사무소',
+// (PC버전 script.js의 부서 목록과 같게 맞춤 + 읍면·보건지소 등 현장 장소)
+const DEPTS = ['자치행정담당관', '기획예산과', '허가민원과', '복지정책과', '세무회계과',
+  '스마트교통과', '관광문화과', '경제에너지과', '교육체육과', '해양수산과',
+  '삭도추진단', '도시계획과', '건설과', '재난안전과', '산림녹지과',
+  '환경과', '보건정책과', '건강관리과', '농정축산과', '농촌개발과',
+  '기술지원과', '상하수도사업소', '육아지원센터',
+  '양양읍', '서면', '손양면', '현북면', '현남면', '강현면',
+  '의회사무과',
   '서면보건지소', '손양보건지소', '현북보건지소', '어성전보건진료소', '입암보건진료소',
-  '자원봉사센터', '선사유적박물관', '국민체육센터', '웰컴센터', '수영장', '양양군의회'];
+  '자원봉사센터', '선사유적박물관', '국민체육센터', '웰컴센터', '수영장'];
 
 // =====================================================
 // 2. 준비물 (작은 도우미 함수들)
@@ -375,14 +378,29 @@ function exportCsv() {
 
   // 맨 앞 \uFEFF 는 엑셀에서 한글이 깨지지 않게 해줌
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const name = 'PC수리기록_' + from + '_' + to + '.csv';
+  const file = new File([blob], name, { type: 'text/csv' });
+
+  // 폰의 '공유' 창 띄우기 → 카톡, 이메일 등을 골라서 보낼 수 있음
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: name })
+      .then(() => toast(rows.length + '건 보냈어요'))
+      .catch(err => { if (err.name !== 'AbortError') downloadFile(file); });  // 취소는 그냥 넘어감
+  } else {
+    downloadFile(file);   // 공유가 안 되는 기기는 파일로 내려받기
+  }
+}
+
+// 공유가 안 될 때만 쓰는 예비용: 파일 내려받기
+function downloadFile(file) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'PC수리기록_' + from + '_' + to + '.csv';
+  a.href = URL.createObjectURL(file);
+  a.download = file.name;
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  toast(rows.length + '건 내보냈어요');
+  toast('공유가 안 되는 기기라 파일로 내려받았어요');
 }
 
 // =====================================================
