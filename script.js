@@ -66,12 +66,13 @@ const OPTIONS = {
 // 구분이 H/W(하드웨어)로 자동 선택되는 PC 증상 (나머지 PC 증상은 S/W, 모니터·기타는 H/W)
 const HW_SYMPTOMS = ["부팅안됨", "전원안들어옴", "블루스크린", "무한재부팅"];
 
-// 엑셀 보고서 표지의 결재란 (사람이 바뀌면 여기만 고치세요)
+// 엑셀 보고서 표지의 결재란 [구분, 소속, 성명]
+// 성명은 개인정보라 코드에 넣지 않고 비워 둠 → 출력한 뒤 직접 적거나 서명
 const APPROVERS = [
-  ["점검", "완컴", "최승완"],
-  ["검토", "양양군", "김효근"],
-  ["검토", "양양군", "양희성"],
-  ["확인", "양양군", "이기선"],
+  ["점검", "완컴", ""],
+  ["검토", "양양군", ""],
+  ["검토", "양양군", ""],
+  ["확인", "양양군", ""],
 ];
 const REPORT_TITLE = "양양군청 행정업무용 PC 유지보수 내역";
 const MIN_ROWS = 30; // 내역표 한 장의 최소 줄 수 (모자라면 빈 줄로 채움)
@@ -172,32 +173,42 @@ function deleteRecord(id) {
   return dbRun("readwrite", (s) => s.delete(id));
 }
 
-// 사용자가 입력한 글자에 <, > 같은 특수문자가 있어도
-// 화면이 깨지지 않도록 안전한 글자로 바꿔 주는 함수
-function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
+// 화면 요소를 만드는 함수 (보안: HTML 글자를 끼워 넣지 않고 요소를 직접 만듦)
+//   el("p", { class: "empty" }, "기록이 없습니다.") → <p class="empty">기록이 없습니다.</p>
+//   children 의 글자는 항상 "글자 그대로" 들어가므로 <script> 같은 걸 입력해도 실행되지 않음
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === "class") node.className = value;
+    else if (key === "dataset") Object.assign(node.dataset, value);
+    else node[key] = value;
+  }
+  node.append(...children.flat().filter((c) => c != null && c !== false));
+  return node;
+}
+
+// <option> 하나 만들기 (value를 안 주면 보이는 글자가 값)
+function option(text, value = text) {
+  return el("option", { value }, text);
 }
 
 // 부서 드롭다운(select)에 묶음(optgroup)별로 선택지를 채워 넣는 함수
 function fillDeptSelect() {
-  // 맨 위 안내 문구 (값이 비어 있어서 이걸 고른 채로는 저장 안 됨)
-  deptSelect.innerHTML = '<option value="">부서를 선택하세요</option>' +
-    DEPT_GROUPS.map(([group, items]) => {
-      const options = items.map((item) => `<option>${item}</option>`).join("");
-      return group ? `<optgroup label="${group}">${options}</optgroup>` : options;
-    }).join("");
+  deptSelect.replaceChildren(
+    option("부서를 선택하세요", ""), // 맨 위 안내 문구 (값이 비어 있어서 이걸 고른 채로는 저장 안 됨)
+    ...DEPT_GROUPS.flatMap(([group, items]) => {
+      const options = items.map((item) => option(item));
+      return group ? [el("optgroup", { label: group }, options)] : options;
+    })
+  );
 }
 
 // 부서에 맞게 장소 칸을 새로 그리는 함수 (부서를 바꾸면 장소는 초기화)
 function renderPlace() {
   const list = PLACES[deptSelect.value];
-  placeSelect.innerHTML = list
-    ? '<option value="">선택 안 함</option>' +
-      list.map((p) => `<option>${p}</option>`).join("") +
-      `<option value="${ETC}">직접 입력</option>`
-    : "";
+  placeSelect.replaceChildren(...(list
+    ? [option("선택 안 함", ""), ...list.map((p) => option(p)), option("직접 입력", ETC)]
+    : []));
   placeEtc.value = "";
   show(placeBox, !!deptSelect.value);  // 부서를 골라야 장소 칸이 나옴
   show(placeSelect, !!list);           // 목록 없는 부서는 직접 입력칸만
@@ -221,14 +232,13 @@ function setEtc(input, on) {
   if (!on) input.value = "";
 }
 
-// 버튼 목록 HTML 만들기 (맨 끝에 "기타(직접입력)" 버튼 추가)
+// 버튼 목록 만들기 (맨 끝에 "기타(직접입력)" 버튼 추가)
 //   name: "symptom" 또는 "action"
-function chipsHtml(name, items) {
-  return [...items, ETC].map((v) => `
-    <label class="device-option">
-      <input type="radio" name="${name}" value="${v}" required>
-      <span>${v === ETC ? "기타(직접입력)" : v}</span>
-    </label>`).join("");
+function chips(name, items) {
+  return [...items, ETC].map((v) =>
+    el("label", { class: "device-option" },
+      el("input", { type: "radio", name, value: v, required: true }),
+      el("span", {}, v === ETC ? "기타(직접입력)" : v)));
 }
 
 // 고른 버튼 값 또는 직접 입력한 글자를 꺼내는 함수
@@ -253,8 +263,8 @@ function renderFlow() {
   const device = form.querySelector('input[name="device"]:checked')?.value;
   const opt = OPTIONS[device]; // "기타"거나 아직 안 골랐으면 undefined
 
-  symptomBtns.innerHTML = opt ? chipsHtml("symptom", opt.symptoms) : "";
-  actionBtns.innerHTML = opt ? chipsHtml("action", opt.actions) : "";
+  symptomBtns.replaceChildren(...(opt ? chips("symptom", opt.symptoms) : []));
+  actionBtns.replaceChildren(...(opt ? chips("action", opt.actions) : []));
   // 목록이 없는 "기타"는 처음부터 직접 입력칸 2개만 보여줌
   setEtc(symptomEtc, device === "기타");
   setEtc(actionEtc, device === "기타");
@@ -329,20 +339,29 @@ form.addEventListener("submit", (event) => {
   // 기본 동작(페이지 새로고침)을 막음
   event.preventDefault();
 
-  // 입력칸의 값을 모아서 기록 하나를 만듦
+  // 입력칸의 값을 모아서 기록 하나를 만듦 (글자 수는 입력칸 maxlength와 같게 한 번 더 자름)
   const record = {
     id: Date.now(), // 지금 시각(숫자)을 고유번호로 사용
     date: dateInput.value,
     dept: deptSelect.value,
-    place: getPlace(),
-    userName: document.getElementById("userName").value.trim(),
+    place: getPlace().slice(0, 50),
+    userName: document.getElementById("userName").value.trim().slice(0, 50),
     device: form.querySelector('input[name="device"]:checked').value,
     kind: form.querySelector('input[name="kind"]:checked').value,
-    symptom: getChoice("symptom", symptomEtc),
-    action: getChoice("action", actionEtc),
-    memo: document.getElementById("memo").value.trim(),
-    parts: document.getElementById("parts").value.trim(),
+    symptom: getChoice("symptom", symptomEtc).slice(0, 100),
+    action: getChoice("action", actionEtc).slice(0, 100),
+    memo: document.getElementById("memo").value.trim().slice(0, 500),
+    parts: document.getElementById("parts").value.trim().slice(0, 100),
   };
+
+  // 정해진 값만 들어가야 하는 칸은 한 번 더 확인 (화면을 조작해 이상한 값을 넣는 것 방지)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(record.date) ||
+      !DEPT_GROUPS.some(([, items]) => items.includes(record.dept)) ||
+      !["PC", "모니터", "기타"].includes(record.device) ||
+      !["H/W", "S/W"].includes(record.kind)) {
+    alert("입력값이 올바르지 않습니다. 다시 확인해 주세요.");
+    return;
+  }
 
   // 새 기록을 저장
   addRecord(record);
@@ -406,23 +425,20 @@ document.querySelectorAll(".toggle-btn").forEach((btn) => {
 listMonth.addEventListener("change", renderList);
 listDay.addEventListener("change", renderList);
 
-// 기록 한 건을 HTML 글자로 만드는 함수
-function recordHtml(r) {
-  return `
-    <div class="record">
-      <div class="record-head">
-        <div>
-          <span class="tag">${escapeHtml(r.device)} · ${r.kind || guessKind(r.device, r.symptom)}</span>
-          <span class="who">${escapeHtml(deptName(r))}</span>
-        </div>
-        <button class="btn-delete" data-id="${r.id}">삭제</button>
-      </div>
-      <p><b>증상:</b> ${escapeHtml(r.symptom)}</p>
-      <p><b>조치:</b> ${escapeHtml(r.action)}</p>
-      ${r.memo ? `<p><b>메모:</b> ${escapeHtml(r.memo)}</p>` : ""}
-      <p><b>부품:</b> ${r.parts ? escapeHtml(r.parts) : "없음"}</p>
-    </div>
-  `;
+// 기록 한 건을 화면 요소로 만드는 함수
+function recordEl(r) {
+  const line = (title, text) => el("p", {}, el("b", {}, `${title}:`), " ", String(text ?? ""));
+  return el("div", { class: "record" },
+    el("div", { class: "record-head" },
+      el("div", {},
+        el("span", { class: "tag" }, `${r.device ?? ""} · ${r.kind || guessKind(r.device, r.symptom)}`),
+        " ",
+        el("span", { class: "who" }, deptName(r))),
+      el("button", { type: "button", class: "btn-delete", dataset: { id: r.id } }, "삭제")),
+    line("증상", r.symptom),
+    line("조치", r.action),
+    r.memo && line("메모", r.memo),
+    line("부품", r.parts || "없음"));
 }
 
 // 기록들을 최신 날짜가 위로 오도록 정렬 (같은 날짜면 나중에 저장한 것이 위로)
@@ -457,7 +473,7 @@ function renderList() {
 
   // 기록이 하나도 없으면 안내 문구만 보여주고 끝
   if (records.length === 0) {
-    recordList.innerHTML = '<p class="empty">기록이 없습니다.</p>';
+    recordList.replaceChildren(el("p", { class: "empty" }, "기록이 없습니다."));
     return;
   }
 
@@ -468,16 +484,11 @@ function renderList() {
     groups[r.date].push(r);
   });
 
-  // 화면에 넣을 HTML 글자를 차곡차곡 만들기
-  let html = "";
-  for (const date in groups) {
-    const list = groups[date];
-    html += `<h3 class="date-title">📅 ${date} · ${list.length}건</h3>`;
-    list.forEach((r) => {
-      html += recordHtml(r);
-    });
-  }
-  recordList.innerHTML = html;
+  // 날짜 제목 + 그날 기록들을 차례로 화면에 넣기
+  recordList.replaceChildren(...Object.entries(groups).flatMap(([date, list]) => [
+    el("h3", { class: "date-title" }, `📅 ${date} · ${list.length}건`),
+    ...list.map(recordEl),
+  ]));
 }
 
 // 목록 안의 [삭제] 버튼을 눌렀을 때 실행
@@ -648,17 +659,20 @@ function fillWeekOptions() {
     const [by, bm, bw] = b.split("-").map(Number);
     return by - ay || bm - am || bw - aw;
   });
-  csvWeek.innerHTML = keys.length
+  csvWeek.replaceChildren(...(keys.length
     ? keys.map((k) => {
         const [y, m, w] = k.split("-");
-        return `<option value="${k}">${y}년 ${m}월 ${w}주차 · ${counts[k]}건</option>`;
-      }).join("")
-    : '<option value="">저장된 기록 없음</option>';
+        return option(`${y}년 ${m}월 ${w}주차 · ${counts[k]}건`, k);
+      })
+    : [option("저장된 기록 없음", "")]));
 }
 
 // 쉼표·따옴표·줄바꿈이 들어 있어도 칸이 깨지지 않도록 "..."로 감싸는 함수
+// 보안: = + - @ 등으로 시작하면 엑셀이 수식으로 실행하므로 앞에 ' 를 붙여 글자로 취급하게 함
 function csvCell(value) {
-  return `"${String(value).replace(/"/g, '""')}"`;
+  let text = String(value ?? "");
+  if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 // [CSV] 버튼: 고른 주차의 기록을 CSV 파일로 내보냄
@@ -710,20 +724,20 @@ function fillYearOptions() {
 
   const selected = statsYear.value; // 이미 고른 연도는 유지
   const sorted = [...years].sort((a, b) => b - a); // 최근 연도가 위로
-  statsYear.innerHTML = sorted.map((y) => `<option value="${y}">${y}년</option>`).join("");
+  statsYear.replaceChildren(...sorted.map((y) => option(`${y}년`, String(y))));
   if (selected) statsYear.value = selected;
 }
 
 // 기간 드롭다운 채우기: 연간 전체 / 1~4분기 / 1~12월
 function fillPeriodOptions() {
-  let html = '<option value="year">연간 전체</option>';
+  const options = [option("연간 전체", "year")];
   for (let q = 1; q <= 4; q++) {
-    html += `<option value="q${q}">${q}분기</option>`;
+    options.push(option(`${q}분기`, `q${q}`));
   }
   for (let m = 1; m <= 12; m++) {
-    html += `<option value="m${m}">${m}월</option>`;
+    options.push(option(`${m}월`, `m${m}`));
   }
-  statsPeriod.innerHTML = html;
+  statsPeriod.replaceChildren(...options);
 }
 
 // 목록에서 항목별 건수를 세는 함수
@@ -736,25 +750,23 @@ function countBy(records, key) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]);
 }
 
-// 막대그래프 HTML을 만드는 함수
-function barChartHtml(title, rows) {
-  let html = `<h3 class="stats-title">${title}</h3>`;
+// 막대그래프 요소들을 만드는 함수 (제목 + 막대 줄들)
+function barChart(title, rows) {
+  const titleEl = el("h3", { class: "stats-title" }, title);
   if (rows.length === 0) {
-    return html + '<p class="empty">자료 없음</p>';
+    return [titleEl, el("p", { class: "empty" }, "자료 없음")];
   }
   const max = Math.max(...rows.map((row) => row[1])); // 가장 큰 값 = 막대 100%
-  rows.forEach(([name, count]) => {
+  return [titleEl, ...rows.map(([name, count]) => {
     // 막대 길이(%) 계산. 0건은 막대 없음, 1건 이상은 최소 3%로 보이게
     const percent = count ? Math.max((count / max) * 100, 3) : 0;
-    html += `
-      <div class="bar-row">
-        <span class="bar-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
-        <div class="bar-track"><div class="bar-fill" style="width:${percent}%"></div></div>
-        <span class="bar-count">${count}건</span>
-      </div>
-    `;
-  });
-  return html;
+    const fill = el("div", { class: "bar-fill" });
+    fill.style.width = `${percent}%`; // 보안 정책상 style="..." 글자 대신 이렇게 지정
+    return el("div", { class: "bar-row" },
+      el("span", { class: "bar-name", title: name }, name),
+      el("div", { class: "bar-track" }, fill),
+      el("span", { class: "bar-count" }, `${count}건`));
+  })];
 }
 
 // 통계 화면에서 고른 연도·기간의 기록과 기간 이름을 돌려주는 함수
@@ -784,13 +796,10 @@ function renderStats() {
   const period = statsPeriod.value;
   const { records, label } = getStatsRecords();
 
-  // 결과 HTML 만들기
-  let html = `
-    <div class="stats-total">
-      ${label} 처리 건수
-      <strong>${records.length}건</strong>
-    </div>
-  `;
+  // 결과 요소 만들기
+  const parts = [
+    el("div", { class: "stats-total" }, `${label} 처리 건수 `, el("strong", {}, `${records.length}건`)),
+  ];
 
   // 연간/분기 통계일 때는 월별 건수 추이도 보여줌
   if (!period.startsWith("m")) {
@@ -801,15 +810,17 @@ function renderStats() {
       `${m}월`,
       records.filter((r) => Number(r.date.slice(5, 7)) === m).length,
     ]);
-    html += barChartHtml("📅 월별 건수", records.length ? monthRows : []);
+    parts.push(...barChart("📅 월별 건수", records.length ? monthRows : []));
   }
 
-  html += barChartHtml("🏢 부서별 발생 순위", countBy(records, "dept"));
-  html += barChartHtml("⚠️ 증상별 발생 순위", countBy(records, "symptom"));
-  html += barChartHtml("💻 대상별", countBy(records, "device"));
-  html += barChartHtml("🔧 조치사항별", countBy(records, "action"));
+  parts.push(
+    ...barChart("🏢 부서별 발생 순위", countBy(records, "dept")),
+    ...barChart("⚠️ 증상별 발생 순위", countBy(records, "symptom")),
+    ...barChart("💻 대상별", countBy(records, "device")),
+    ...barChart("🔧 조치사항별", countBy(records, "action")),
+  );
 
-  statsResult.innerHTML = html;
+  statsResult.replaceChildren(...parts);
 }
 
 // 연도나 기간을 바꾸면 통계 다시 그리기
@@ -839,10 +850,11 @@ async function init() {
       if (r.device === undefined && r.target !== undefined) r.device = r.target;
       s.put(r);
     }));
-    // 혹시 몰라 지우지 않고 백업 이름으로 바꿔 둠 (다시 옮겨지지는 않음)
-    localStorage.setItem(STORAGE_KEY + "_backup", old);
     localStorage.removeItem(STORAGE_KEY);
   }
+  // 보안: 옮긴 뒤 남아 있던 옛 사본(백업)은 지움 → 목록에서 삭제한 기록이 다른 곳에 남지 않게
+  // (기록은 이미 IndexedDB에 옮겨져 있음)
+  localStorage.removeItem(STORAGE_KEY + "_backup");
 
   cache = await dbRun("readonly", (s) => s.getAll());
   fillYearOptions();
@@ -853,8 +865,17 @@ async function init() {
 init();
 
 // 오프라인에서도 작동하도록 서비스 워커(sw.js) 등록
+// 보안 정책(Trusted Types)상 등록할 주소를 허가받아야 함 → "sw.js" 하나만 허가하는 규칙(swPolicy)을 만듦
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js");
+  const swUrl = window.trustedTypes
+    ? trustedTypes.createPolicy("swPolicy", {
+        createScriptURL: (url) => {
+          if (url !== "sw.js") throw new TypeError("허용되지 않은 주소: " + url);
+          return url;
+        },
+      }).createScriptURL("sw.js")
+    : "sw.js";
+  navigator.serviceWorker.register(swUrl);
 }
 
 dateInput.value = getToday();            // 날짜칸에 오늘 날짜 자동 입력

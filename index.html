@@ -5,6 +5,11 @@
   <meta charset="UTF-8">
   <!-- 휴대폰 화면 폭에 맞춰 보이도록 설정 (이게 없으면 글씨가 아주 작게 보임) -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- 보안 정책(CSP): 이 앱 자신의 파일만 불러오고, 외부 주소로는 아무것도 보내거나 받지 못하게 막음.
+       require-trusted-types-for: 글자를 HTML로 끼워 넣는 위험한 방식(innerHTML 등)을 브라우저가 아예 차단 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'; require-trusted-types-for 'script'; trusted-types swPolicy">
+  <!-- 다른 사이트로 이동할 때 이 앱 주소를 알려주지 않음 -->
+  <meta name="referrer" content="no-referrer">
   <title>PC 유지보수 기록</title>
   <!-- 홈 화면에 추가(앱 설치)용 설정 파일과 아이콘, 상단바 색 -->
   <link rel="manifest" href="manifest.json">
@@ -48,12 +53,12 @@
         <div id="placeBox" class="hidden">
           <label for="place">장소 <small>(선택)</small></label>
           <select id="place"></select>
-          <input type="text" id="placeEtc" class="etc-input hidden" placeholder="장소를 직접 입력하세요 (예: 웰컴센터)">
+          <input type="text" id="placeEtc" maxlength="50" class="etc-input hidden" placeholder="장소를 직접 입력하세요 (예: 웰컴센터)">
         </div>
 
         <!-- 사용자 이름 -->
         <label for="userName">이름 또는 내선번호 <small>(선택)</small></label>
-        <input type="text" id="userName" placeholder="예: 홍길동 또는 2257">
+        <input type="text" id="userName" maxlength="50" autocomplete="off" placeholder="예: 홍길동 또는 2257">
 
         <!-- 대상: 고르면 아래에 그 대상의 증상 버튼이 나타남 -->
         <label>대상</label>
@@ -76,7 +81,7 @@
         <div id="symptomBox" class="hidden">
           <label>증상</label>
           <div id="symptomBtns" class="chip-group"></div>
-          <input type="text" id="symptomEtc" class="etc-input hidden" placeholder="증상을 직접 입력하세요">
+          <input type="text" id="symptomEtc" maxlength="100" class="etc-input hidden" placeholder="증상을 직접 입력하세요">
         </div>
 
         <!-- 조치사항: 증상을 고르면 나타남 -->
@@ -96,16 +101,16 @@
 
           <label>조치사항</label>
           <div id="actionBtns" class="chip-group"></div>
-          <input type="text" id="actionEtc" class="etc-input hidden" placeholder="조치사항을 직접 입력하세요">
+          <input type="text" id="actionEtc" maxlength="100" class="etc-input hidden" placeholder="조치사항을 직접 입력하세요">
         </div>
 
         <!-- 메모 (자세히 적고 싶을 때만, 비워도 됨) -->
         <label for="memo">메모 <small>(선택)</small></label>
-        <textarea id="memo" rows="2" placeholder="추가로 남길 내용"></textarea>
+        <textarea id="memo" rows="2" maxlength="500" placeholder="추가로 남길 내용"></textarea>
 
         <!-- 사용 부품 (없으면 비워도 됨) -->
         <label for="parts">사용 부품 <small>(없으면 비워두세요)</small></label>
-        <input type="text" id="parts" placeholder="예: 파워서플라이 500W 1개">
+        <input type="text" id="parts" maxlength="100" placeholder="예: 파워서플라이 500W 1개">
 
         <!-- 저장 버튼 -->
         <button type="submit" class="btn-save">💾 저장</button>
@@ -182,9 +187,10 @@
     </section>
   </main>
 
-  <!-- 엑셀(xlsx) 파일을 만들어 주는 라이브러리(SheetJS + 테두리·색 서식 기능).
-       인터넷에서 불러오므로 엑셀 내보내기에는 인터넷 연결 필요 -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <!-- 엑셀(xlsx) 파일을 만들어 주는 라이브러리(xlsx-js-style 1.2.0 = SheetJS + 테두리·색 서식 기능).
+       외부 인터넷(CDN)이 아니라 앱 폴더(lib)에 넣어 두어 변조 위험이 없고 오프라인에서도 작동.
+       integrity: 파일 내용이 한 글자라도 바뀌면 실행하지 않음 (라이브러리를 바꾸면 이 값도 새로 계산해야 함) -->
+  <script src="lib/xlsx.bundle.js" integrity="sha384-OUW9euuUyxyHcAhTqbhI+Iyb8LMssXt/cpz0yXhs9UWG2/R/uaWdakx/4cfww7Vb"></script>
   <!-- 동작(기능) 파일 연결: body 맨 끝에 두어야 위의 요소들을 찾을 수 있음 -->
   <script src="script.js"></script>
 </body>
